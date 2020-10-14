@@ -3,7 +3,12 @@
 #include <WeatherSensors.h>
 #include "IoTNode.h"
 #include "SdCardLogHandlerRK.h"
-
+#include "Ubidots.h"
+#ifndef TOKEN
+  #define TOKEN "BBFF-EYiaDYTpXbmJByMQqjUVXaLtMQ2w4S"
+#endif
+const char * webhook_name="Ubidots";
+Ubidots ubidots(TOKEN, UBI_PARTICLE);
 #define SERIAL_DEBUG
 
 #ifdef SERIAL_DEBUG
@@ -361,24 +366,37 @@ void loop() {
   
   if (readyToGetResetAndSendSensors)
   {
+    sensors.getAndResetAllSensors();
     char msg[256]; 
     uint32_t UT=sensorReadings.unixTime;
-    uint16_t VV= sensorReadings.wind_metersph * 0.001, Precip = sensorReadings.rainmmx1000 / 1000 , DV= sensorReadings.windDegrees, Temp = (sensorReadings.airTempKx10 / 10.0)-273.15, mVB=sensorReadings.millivolts;
-    uint8_t Hum=sensorReadings.humid;
-    uint16_t PB=sensorReadings.barometerhPa;
+    float VV= sensorReadings.wind_metersph * 0.001;
+    float Precip = sensorReadings.rainmmx1000 / 1000; 
+    float DV= sensorReadings.windDegrees; 
+    float Temp = (sensorReadings.airTempKx10 / 10.0)-273.15; 
+    uint16_t mVB=sensorReadings.millivolts;
+    uint16_t Hum=sensorReadings.humid;
+   // float PB=sensorReadings.barometerhPa;
+    
 snprintf(msg, sizeof(msg) , 
-"{\"UT\": %u, \"VV\": %u , \"Precip\": %u , \"DV\": %u , \"Temp\": %u ,\"Hum\": %u  , \"PB\": %u , \"mVB\": %u }" , 
+"{\"UT\": %u, \"VV\": %.1f , \"Precip\": %.1f , \"DV\": %.1f , \"Temp\": %.1f ,\"Hum\": %u  ,\"mVB\": %u }" , 
 UT,
 VV, 
 Precip, 
 DV ,
 Temp, 
-Hum,
-PB,  
+Hum,  
 mVB);
 
  Particle.publish("sensors", msg, PRIVATE);
-    sensors.getAndResetAllSensors();
+ ubidots.add("UnixTime", UT);
+ ubidots.add("Velocidad del Viento", VV); // Change for your variable name
+ ubidots.add("Precipitacion", Precip);
+ ubidots.add("Direccion del viento", DV);
+ ubidots.add("Temperatura", Temp);
+ ubidots.add("Humedad", Hum);
+ ubidots.add("Milivolts", mVB);
+ ubidots.send(webhook_name, PUBLIC); 
+    
 
     String currentCsvData = sensors.sensorReadingsToCsvUS();
 

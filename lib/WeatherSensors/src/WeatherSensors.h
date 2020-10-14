@@ -99,7 +99,7 @@ class WeatherSensors
     }
 
     void begin(void);
-    //float setModeBarometer();//cambiar modo a lectura de presion atmosferica
+    float setModeBarometer();//cambiar modo a lectura de presion atmosferica
     float readPressure();
 
     float getAndResetAnemometerMPH(float * gustMPH);
