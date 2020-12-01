@@ -10,6 +10,7 @@
 
 // include core Particle library
 #include "Particle.h"
+#include <Adafruit_ADS1X15.h>
 
 // include other libraries
 #include <Adafruit_AM2315.h>
@@ -31,6 +32,7 @@ typedef struct // units chosen for data size and readability
     uint16_t barometerhPa; // Could fit into smaller type if needed
     uint16_t gust_metersph; //meters per hour
     uint16_t millivolts; // voltage in mV
+    uint16_t ozone;// concentration
     //uint16_t lux; //Light level in lux
 
 
@@ -56,6 +58,7 @@ class WeatherSensors
   public:
     WeatherSensors() : airTempKMedian(30), relativeHumidtyMedian(30), node()
     {
+      
       pinMode(AnemometerPin, INPUT_PULLUP);
       attachInterrupt(AnemometerPin, &WeatherSensors::handleAnemometerEvent, this, FALLING);
 
@@ -124,6 +127,7 @@ class WeatherSensors
 
     uint16_t getAirTempKMedian();
     uint16_t getRHMedian();
+    uint16_t getAndResetO3();
 
     String sensorReadingsToCsvUS();
     String sensorReadingsToCsvUS(sensorReadings_t readings);
@@ -177,7 +181,23 @@ class WeatherSensors
     unsigned int batVoltageCount = 0;
     ///
     float lookupRadiansFromRaw(unsigned int analogRaw);
-
+    //O3
+    Adafruit_ADS1115 ads;//ads1115 con direccion default
+    
+      #define SPEC_VGAS_PIN_O3 ads.readADC_SingleEnded(0) // A9 63
+      #define SPEC_VREF_PIN_O3 ads.readADC_SingleEnded(1) // A8 62 
+      #define SPEC_VTEMP_PIN_O3 N_A3 //
+      #define SPEC_CONSTANT_1_M_O3 -59.714
+      #define ADC_RESOLUTION 0.00322265
+      #define BCOEFFICIENT 4500
+      #define TEMPERATURENOMINAL 25
+     float vref_o3 = 0;
+      float vgas_o3 = 0;
+      float temp_o3 = 0;
+      float tempVin = 0;
+      float concentration_o3 = 0;
+      float concentration_o3_past = 0;
+      float rsult=0.0;
 };
 
 #endif
