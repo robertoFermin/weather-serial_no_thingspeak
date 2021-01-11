@@ -182,22 +182,24 @@ class WeatherSensors
     ///
     float lookupRadiansFromRaw(unsigned int analogRaw);
     //O3
-    Adafruit_ADS1115 ads;//ads1115 con direccion default
     
-      #define SPEC_VGAS_PIN_O3 ads.readADC_SingleEnded(0) // A9 63
-      #define SPEC_VREF_PIN_O3 ads.readADC_SingleEnded(1) // A8 62 
-      #define SPEC_VTEMP_PIN_O3 N_A3 //
-      #define SPEC_CONSTANT_1_M_O3 -59.714
-      #define ADC_RESOLUTION 0.00322265
-      #define BCOEFFICIENT 4500
-      #define TEMPERATURENOMINAL 25
-     float vref_o3 = 0;
-      float vgas_o3 = 0;
-      float temp_o3 = 0;
-      float tempVin = 0;
-      float concentration_o3 = 0;
-      float concentration_o3_past = 0;
-      float rsult=0.0;
+  //ads1115 con direccion default
+    
+///////////////////////////////////////////////////////////////      
+ unsigned long tiempo1=0;
+    unsigned long tiempo2=0;
+    unsigned long tiempo3=0;
+    float vref_o3 = 0;
+    float vgas_o3 = 0;
+    float temp_o3 = 0;
+    float tempVin = 0;
+    float Vvref_o3 =0;
+    float Vvgas_o3 =0;
+    float Vtemp_o3=0;
+    int cont=0;
+    float sum =0;
+    float prom=0;
+    Adafruit_ADS1115 ads;
 };
 
 #endif

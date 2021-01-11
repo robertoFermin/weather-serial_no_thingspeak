@@ -398,32 +398,31 @@ uint16_t WeatherSensors::getRHMedian()
   uint16_t RHMedian = relativeHumidtyMedian.getMedian();
   return RHMedian;
 }
-uint16_t WeatherSensors::getAndResetO3(){
-tempVin = analogRead(SPEC_VTEMP_PIN_O3) * ADC_RESOLUTION;
- temp_o3 = (3 / tempVin) -1 ;
- temp_o3 = log(temp_o3);
- temp_o3 /= BCOEFFICIENT;
- temp_o3 += 1.0 / (TEMPERATURENOMINAL + 273.15);
- temp_o3 = 1.0 / temp_o3;
- temp_o3 -= 273.15;
+/*uint16_t WeatherSensors::getAndResetO3(){//sensor spec de ozono
 
-    vref_o3 = analogRead(SPEC_VREF_PIN_O3) * ADC_RESOLUTION; // read the input pin
- vgas_o3 = analogRead(SPEC_VGAS_PIN_O3) * ADC_RESOLUTION;
-int concentration_o3 = (vgas_o3 - vref_o3)*SPEC_CONSTANT_1_M_O3;
-  if(concentration_o3 >= 0.0){
- rsult = concentration_o3;
- concentration_o3_past = concentration_o3;
- }
- else{
- rsult = concentration_o3_past;
- delay(2000);
- }
-Serial.print("Ozone Concentration: "); //
- Serial.print(rsult,15);
- Serial.print(" ppm\n");
- delay(2000);
+ Vvgas_o3 = (ads.readADC_SingleEnded(0)*0.1875)/1000.0;
+    Vvref_o3 = (ads.readADC_SingleEnded(1)*0.1875)/1000.0; //* ADC_RESOLUTION; // read the input pin
+    Vtemp_o3 = (ads.readADC_SingleEnded(2)*0.1875)/1000.0;
+    tempVin = (87/3.3)*Vtemp_o3 - 18;//temperatura en centigrados
+    float concentration_o3 = (Vvgas_o3 - 1.654640) / (499*1000000000) / (-33.56);//PPM
+ 
+    tiempo1=millis();//loop para promedio de datos 
+if(tiempo1 <= (tiempo2+3600000)){//1752 datos en una hora
+    cont++;
+    sum += concentration_o3;
+    prom =sum / cont;
+     //Serial.println("Ozone Concentration: " + String(prom, 15)+ "ppm/n"); //
+     return prom,15;
+     return tempVin;
+     //Serial.println("Voltaje: "+ String(Vvgas_o3)+ "mV");
+}else{
+    cont=0;
+    tiempo2=millis();
+    sum=0;
+    prom = 0;
 }
-
+}
+*/
 float WeatherSensors::readPressure()
 {
   return barom.readPressure();
@@ -460,8 +459,8 @@ void WeatherSensors::getAndResetAllSensors()
   //Particle.publish("Temperatura", String(sensorReadings.airTempKx10));
   uint16_t humidityRH = relativeHumidtyMedian.getMedian();
   sensorReadings.humid =(uint8_t) ceil(humidityRH);
-   float O3 = getAndResetO3();
-  sensorReadings.ozone=(uint16_t) ceil(O3);
+   //float O3 = getAndResetO3();
+  //sensorReadings.ozone=(uint16_t) ceil(O3);
   //Particle.publish("Humedad", String(sensorReadings.humid));
   float pressure = getAndResetPressurePascals();
   sensorReadings.barometerhPa = pressure/10.0;

@@ -1,4 +1,4 @@
-
+float prom_o3=0;
 #include "Particle.h"
 #include <WeatherSensors.h>
 #include "IoTNode.h"
@@ -7,7 +7,9 @@
 //#ifndef TOKEN
 //  #define TOKEN "BBFF-EYiaDYTpXbmJByMQqjUVXaLtMQ2w4S"
 //#endif
-
+unsigned long tiempo1=0;//timer para promediar los sensores spec
+    unsigned long tiempo2=0;
+    unsigned long tiempo3=0;
 const char* WEBHOOK_NAME = "Ubidots";
 Ubidots ubidots("webhook", UBI_PARTICLE);
 //const char * webhook_name="Ubidots";
@@ -295,7 +297,7 @@ void connect()//Agregar una rutina de conexión explícita que debe funcionar an
     DEBUG_PRINTLN("Particle connected");
   }
 }
-
+Adafruit_ADS1115 ads;//ads1115 con direccion default
 // setup() runs once, when the device is first turned on.
 void setup() {
   ubidots.setDebug(true);
@@ -305,11 +307,13 @@ void setup() {
 
   Serial.begin(115200);//inicializamos el puerto serial
   Serial1.begin(115200);
+  
+  ads.begin();
 
   node.begin();
   node.setPowerON(EXT3V3,true);
   node.setPowerON(EXT5V,true);
-
+  tiempo2= millis();
   #ifdef IOTDEBUG
   delay(5000);
  
@@ -372,9 +376,10 @@ void setup() {
 // Note that CSV format is:
 // unixTime,windDegrees,wind_speed,humidity,air_temp,rain,pressure,wind_gust,millivolts,lux
 void loop() {
-  
+  //float spec_O3();
   if (readyToGetResetAndSendSensors)//si esta listo para reset y mandar datos
   {
+    
     sensors.getAndResetAllSensors();//reseteamos los sensores y los mandamos llamar
     char msg[256]; //cadena de 256 bytes
     uint32_t UT=sensorReadings.unixTime;//lectura del unixtime
@@ -384,11 +389,13 @@ void loop() {
     float Temp = (sensorReadings.airTempKx10 / 10.0)-273.15; //lectura de temperatura
     uint16_t mVB=sensorReadings.millivolts;//lectura de voltaje
     uint16_t Hum=sensorReadings.humid;//lectura de humedad
-    uint16_t ozo=sensorReadings.ozone;
+    float promedio = spec_O3();
+    
+    //uint16_t ozo=sensorReadings.ozone;
    // float PB=sensorReadings.barometerhPa;
     
 snprintf(msg, sizeof(msg) , //imprimimos la cadena 
-"{\"UT\": %u, \"VV\": %.1f , \"Precip\": %.1f , \"DV\": %.1f , \"Temp\": %.1f ,\"Hum\": %u  ,\"mVB\": %u , \"O3\": %.1f }" , 
+"{\"UT\": %u, \"VV\": %.1f , \"Precip\": %.1f , \"DV\": %.1f , \"Temp\": %.1f ,\"Hum\": %u  ,\"mVB\": %u , \"O3\": %.15f }" , 
 UT,
 VV, 
 Precip, 
@@ -396,7 +403,9 @@ DV ,
 Temp, 
 Hum,  
 mVB,
-ozo);
+//ozo
+promedio
+);
 
  Particle.publish("sensors", msg, PRIVATE);//mandamos los datos a la nube de particle
  ubidots.add("UnixTime", UT);//mandamos lo datos a la nube de ubidots
@@ -512,3 +521,40 @@ void unplugged()
   #endif
 
 }
+
+float spec_O3(){
+    float vref_o3 = 0;
+    float vgas_o3 = 0;
+    float temp_o3 = 0;
+    float tempVin = 0;
+    float Vvref_o3 =0;
+    float Vvgas_o3 =0;
+    float Vtemp_o3=0;
+    int cont=0;
+    float sum =0;
+    
+    
+Vvgas_o3 = (ads.readADC_SingleEnded(0)*0.1875)/1000.0;
+    //Vvref_o3 = (ads.readADC_SingleEnded(1)*0.1875)/1000.0; //* ADC_RESOLUTION; // read the input pin
+    //Vtemp_o3 = (ads.readADC_SingleEnded(2)*0.1875)/1000.0;
+    //tempVin = (87/3.3)*Vtemp_o3 - 18;//temperatura en centigrados
+    float concentration_o3 = -59.714184029560909661993832719073 * (Vvgas_o3 - 1.6546);//PPM
+ 
+    tiempo1=millis();//loop para promedio de datos 
+if(tiempo1 <= (tiempo2+3600000)){//1752 datos en una hora
+    cont++;
+    sum += concentration_o3;
+    prom_o3 =sum / cont;
+     //Serial.println("Ozone Concentration: " + String(prom, 15)+ "ppm/n"); //
+     return prom_o3;
+     //return tempVin;
+     //Serial.println("Voltaje: "+ String(Vvgas_o3)+ "mV");
+}else{
+    cont=0;
+    tiempo2=millis();
+    sum=0;
+    prom_o3 = 0;
+}
+}
+
+
