@@ -4,6 +4,8 @@ float prom_o3=0;
 #include "IoTNode.h"
 #include "SdCardLogHandlerRK.h"
 #include "Ubidots.h"
+#include "PMS7003-Particle-Sensor-Serial.h"
+
 //#ifndef TOKEN
 //  #define TOKEN "BBFF-EYiaDYTpXbmJByMQqjUVXaLtMQ2w4S"
 //#endif
@@ -307,9 +309,9 @@ void setup() {
 
   Serial.begin(115200);//inicializamos el puerto serial
   Serial1.begin(115200);
-  
+   
   ads.begin();
-
+ads.setGain(GAIN_TWOTHIRDS); 
   node.begin();
   node.setPowerON(EXT3V3,true);
   node.setPowerON(EXT5V,true);
@@ -376,10 +378,23 @@ void setup() {
 // Note that CSV format is:
 // unixTime,windDegrees,wind_speed,humidity,air_temp,rain,pressure,wind_gust,millivolts,lux
 void loop() {
-  //float spec_O3();
+  
+   double multiplier = 0.1875F; //milli Volts per bit for ADS1115
+  //double multiplier = 3.0F; //milli Volts per bit for ADS1105
+
+  float adc0, adc1, adc2, adc3;
+  float av0, av1, av2, av3;
+  
+  adc0 = ads.readADC_SingleEnded(0);
+  av0 = adc0 * multiplier;
+  adc1 = ads.readADC_SingleEnded(1);
+  av1= adc1 * multiplier;
+  adc2 = ads.readADC_SingleEnded(2);
+  av2= adc2 * multiplier;
+  adc3 = ads.readADC_SingleEnded(3);
+  av3= adc3 * multiplier;
   if (readyToGetResetAndSendSensors)//si esta listo para reset y mandar datos
   {
-    
     sensors.getAndResetAllSensors();//reseteamos los sensores y los mandamos llamar
     char msg[256]; //cadena de 256 bytes
     uint32_t UT=sensorReadings.unixTime;//lectura del unixtime
@@ -389,13 +404,22 @@ void loop() {
     float Temp = (sensorReadings.airTempKx10 / 10.0)-273.15; //lectura de temperatura
     uint16_t mVB=sensorReadings.millivolts;//lectura de voltaje
     uint16_t Hum=sensorReadings.humid;//lectura de humedad
-    float promedio = spec_O3();
-    
     //uint16_t ozo=sensorReadings.ozone;
+     
+  adc0 = ads.readADC_SingleEnded(0);
+  av0 = adc0 * multiplier;
+  adc1 = ads.readADC_SingleEnded(1);
+  av1= adc1 * multiplier;
+  adc2 = ads.readADC_SingleEnded(2);
+  av2= adc2 * multiplier;
+  adc3 = ads.readADC_SingleEnded(3);
+  av3= adc3 * multiplier;
+    
+    //uint16_t promedio = spec_O3();
    // float PB=sensorReadings.barometerhPa;
     
 snprintf(msg, sizeof(msg) , //imprimimos la cadena 
-"{\"UT\": %u, \"VV\": %.1f , \"Precip\": %.1f , \"DV\": %.1f , \"Temp\": %.1f ,\"Hum\": %u  ,\"mVB\": %u , \"O3\": %.15f }" , 
+"{\"UT\": %u, \"VV\": %.1f , \"Precip\": %.1f , \"DV\": %.1f , \"Temp\": %.1f ,\"Hum\": %u  ,\"mVB\": %u , \"O3\": %.5f ,\"CO\": %.5f ,\"NO2\": %.5f ,\"SO2\": %.5f ,}" , 
 UT,
 VV, 
 Precip, 
@@ -403,8 +427,11 @@ DV ,
 Temp, 
 Hum,  
 mVB,
+av0,
+av1,
+av2,
+av3
 //ozo
-promedio
 );
 
  Particle.publish("sensors", msg, PRIVATE);//mandamos los datos a la nube de particle
@@ -521,40 +548,62 @@ void unplugged()
   #endif
 
 }
-
-float spec_O3(){
-    float vref_o3 = 0;
-    float vgas_o3 = 0;
-    float temp_o3 = 0;
-    float tempVin = 0;
-    float Vvref_o3 =0;
-    float Vvgas_o3 =0;
-    float Vtemp_o3=0;
-    int cont=0;
-    float sum =0;
+// float spec_O3(){
+//   int cont_o3=0;
+//     float vref_o3 = 0;
+//     float vgas_o3 = 0;
+//     float temp_o3 = 0;
+//     float tempVin = 0;
+//     float Vvref_o3 =0;
+//     float Vvgas_o3 =0;
+//     float Vtemp_o3=0;
     
+//     float sum_o3 =0;
     
-Vvgas_o3 = (ads.readADC_SingleEnded(0)*0.1875)/1000.0;
-    //Vvref_o3 = (ads.readADC_SingleEnded(1)*0.1875)/1000.0; //* ADC_RESOLUTION; // read the input pin
-    //Vtemp_o3 = (ads.readADC_SingleEnded(2)*0.1875)/1000.0;
-    //tempVin = (87/3.3)*Vtemp_o3 - 18;//temperatura en centigrados
-    float concentration_o3 = -59.714184029560909661993832719073 * (Vvgas_o3 - 1.6546);//PPM
+// Vvgas_o3 = (ads.readADC_SingleEnded(0)*0.1875)/1000.0;
+    
+//     float concentration_o3 = -59.714184029560909661993832719073 * (Vvgas_o3 - 1.6546);//PPM
  
-    tiempo1=millis();//loop para promedio de datos 
-if(tiempo1 <= (tiempo2+3600000)){//1752 datos en una hora
-    cont++;
-    sum += concentration_o3;
-    prom_o3 =sum / cont;
-     //Serial.println("Ozone Concentration: " + String(prom, 15)+ "ppm/n"); //
-     return prom_o3;
-     //return tempVin;
-     //Serial.println("Voltaje: "+ String(Vvgas_o3)+ "mV");
-}else{
-    cont=0;
-    tiempo2=millis();
-    sum=0;
-    prom_o3 = 0;
-}
-}
+//     cont_o3++;
+//     sum_o3 += concentration_o3;
+//     prom_o3 =sum_o3 / cont_o3;
+    
+//     return Vvgas_o3;
+   
+// }
 
 
+
+// float Specs(){
+//   double multiplier = 0.1875F; //milli Volts per bit for ADS1115
+//   //double multiplier = 3.0F; //milli Volts per bit for ADS1105
+// char pm[256];
+//   short adc0, adc1, adc2, adc3;
+//   double av0, av1, av2, av3;
+  
+//   adc0 = ads.readADC_SingleEnded(0);
+//   av0 = adc0 * multiplier;
+//   adc1 = ads.readADC_SingleEnded(1);
+//   av1= adc1 * multiplier;
+//   adc2 = ads.readADC_SingleEnded(2);
+//   av2= adc2 * multiplier;
+//   adc3 = ads.readADC_SingleEnded(3);
+//   av3= adc3 * multiplier;
+
+//   snprintf(pm, sizeof(pm) , 
+// 			"{\"A0:\": %.15f, \"A1\": %.15f, \"A2\": %.15f , \"A3\": %.15f }" , 
+
+// av0,
+// av1,
+// av2,
+// av3
+// );
+
+// // Particle.publish("sensors", msg, PRIVATE);	
+// //   Particle.publish("VGAS A0",String(av0,7)); 
+// //   Particle.publish("VGAS A1",String(av1,7)); 
+// //   Particle.publish("VGAS A2",String(av2,7)); 
+// //   Particle.publish("VGAS A3",String(av3,7)); 
+  
+//  // Serial.println(" ");
+// }

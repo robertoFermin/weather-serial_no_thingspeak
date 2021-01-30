@@ -400,6 +400,7 @@ uint16_t WeatherSensors::getRHMedian()
 }
 /*uint16_t WeatherSensors::getAndResetO3(){//sensor spec de ozono
 
+
  Vvgas_o3 = (ads.readADC_SingleEnded(0)*0.1875)/1000.0;
     Vvref_o3 = (ads.readADC_SingleEnded(1)*0.1875)/1000.0; //* ADC_RESOLUTION; // read the input pin
     Vtemp_o3 = (ads.readADC_SingleEnded(2)*0.1875)/1000.0;
@@ -423,6 +424,8 @@ if(tiempo1 <= (tiempo2+3600000)){//1752 datos en una hora
 }
 }
 */
+
+
 float WeatherSensors::readPressure()
 {
   return barom.readPressure();

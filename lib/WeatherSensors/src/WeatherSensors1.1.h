@@ -186,20 +186,7 @@ class WeatherSensors
   //ads1115 con direccion default
     
 ///////////////////////////////////////////////////////////////      
- unsigned long tiempo1=0;
-    unsigned long tiempo2=0;
-    unsigned long tiempo3=0;
-    float vref_o3 = 0;
-    float vgas_o3 = 0;
-    float temp_o3 = 0;
-    float tempVin = 0;
-    float Vvref_o3 =0;
-    float Vvgas_o3 =0;
-    float Vtemp_o3=0;
-    int cont=0;
-    float sum =0;
-    float prom=0;
-    Adafruit_ADS1115 ads;
+ 
 };
 
 #endif
