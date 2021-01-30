@@ -17,7 +17,7 @@ Ubidots ubidots("webhook", UBI_PARTICLE);
 //const char * webhook_name="Ubidots";
 //Ubidots ubidots(TOKEN, UBI_PARTICLE);
 #define SERIAL_DEBUG
-
+int n=0;
 #ifdef SERIAL_DEBUG// conversion debug_print --> serial_print
   #define DEBUG_PRINT(...) Serial.print(__VA_ARGS__)
   #define DEBUG_PRINTLN(...) Serial.println(__VA_ARGS__)
