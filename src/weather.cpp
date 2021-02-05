@@ -15,6 +15,9 @@ void capturePollSensors();
 void getResetAndSendSensors();
 bool syncRTC();
 void unplugged();
+unsigned int pm1();
+unsigned int pm2_5();
+unsigned int pm10();
 #line 3 "c:/Users/BtX/Documents/weather-serial_no_thingspeak_rev2/src/weather.ino"
 #include <WeatherSensors.h>
 #include "IoTNode.h"
@@ -22,12 +25,21 @@ void unplugged();
 #include "Ubidots.h"
 #include "PMS7003-Particle-Sensor-Serial.h"
 
+PMS7003Serial<USARTSerial> pms7003(Serial1, D7);
 //#ifndef TOKEN
 //  #define TOKEN "BBFF-EYiaDYTpXbmJByMQqjUVXaLtMQ2w4S"
 //#endif
 unsigned long tiempo1=0;//timer para promediar los sensores spec
     unsigned long tiempo2=0;
     unsigned long tiempo3=0;
+    float prom_o3P;
+    float prom_o3_past=0;
+    float prom_coP;
+    float prom_co_past=0;
+    float prom_no2P;
+    float prom_no2_past=0;
+    float prom_so2P;
+    float prom_so2_past=0;
 const char* WEBHOOK_NAME = "Ubidots";
 Ubidots ubidots("webhook", UBI_PARTICLE);
 //const char * webhook_name="Ubidots";
@@ -50,7 +62,7 @@ SdCardPrintHandler printToSd(sd, SD_CHIP_SELECT, SPI_FULL_SPEED);//sd es el SdFa
 
 STARTUP(printToSd.withMaxFilesToKeep(3000));//controla el tamaño de archivos
 
-#define SENSOR_SEND_TIME_MS 60000// define un tiempo en milisegundos de envio de datos de los sensores
+#define SENSOR_SEND_TIME_MS 10000// define un tiempo en milisegundos de envio de datos de los sensores
 #define SENSOR_POLL_TIME_MS 2000// define un tiempo en ms de tiempo de sondeo de sensor
 
 #define IOTDEBUG
@@ -323,8 +335,8 @@ void setup() {
   Particle.variable("version",firmwareVersion);
   Particle.variable("devicestatus",deviceStatus);
 
-  Serial.begin(115200);//inicializamos el puerto serial
-  Serial1.begin(115200);
+  Serial.begin();//inicializamos el puerto serial
+  //Serial1.begin(115200);
    
   ads.begin();
 ads.setGain(GAIN_TWOTHIRDS); 
@@ -390,29 +402,58 @@ ads.setGain(GAIN_TWOTHIRDS);
       sensorSendTimer.start();  //comienza a mandar datos
   }
 }
-
+int cont_vgas=0;
+int cont=0;
+double sumvgasco, sumvgaso3, sumvgasno2, sumvgasso2;
+double promvgaso3, promvgasno2, promvgasco, promvgasso2;
+  double sum_1=0;
+  double sum_2=0;
+  double sum_3=0;
+  double sum_4=0;
+  double prom_conc_o3=0.0;
+  double prom_conc_co=0;
+  double prom_conc_no2=0;
+  double prom_conc_so2=0;
 // Note that CSV format is:
 // unixTime,windDegrees,wind_speed,humidity,air_temp,rain,pressure,wind_gust,millivolts,lux
+unsigned long last = 0;
+unsigned long last_pm_reading = 0;
+unsigned long last_25 = 0;
+unsigned long last_pm_reading_25 = 0;
+unsigned long last_10 = 0;
+unsigned long last_pm_reading_10 = 0;
+
 void loop() {
-  
+  cont_vgas++;
    double multiplier = 0.1875F; //milli Volts per bit for ADS1115
   //double multiplier = 3.0F; //milli Volts per bit for ADS1105
 
-  float adc0, adc1, adc2, adc3;
-  float av0, av1, av2, av3;
+  double adc0, adc1, adc2, adc3;
+  double av0, av1, av2, av3;
+ 
   
-  adc0 = ads.readADC_SingleEnded(0);
-  av0 = adc0 * multiplier;
+  
+ adc0 = ads.readADC_SingleEnded(0);
+  av0 = (adc0 * multiplier)/1000;
+  sumvgaso3+=av0;
+  promvgaso3 = sumvgaso3/cont_vgas;
   adc1 = ads.readADC_SingleEnded(1);
-  av1= adc1 * multiplier;
+  av1= (adc1 * multiplier)/1000;
+  sumvgasco+=av1;
+  promvgasco= sumvgasco/cont_vgas;
   adc2 = ads.readADC_SingleEnded(2);
-  av2= adc2 * multiplier;
+  av2= (adc2 * multiplier)/1000;
+  sumvgasno2+=av2;
+  promvgasno2= sumvgasno2/cont_vgas;
   adc3 = ads.readADC_SingleEnded(3);
-  av3= adc3 * multiplier;
+  av3= (adc3 * multiplier)/1000;
+  sumvgasso2+= av3;
+  promvgasso2= sumvgasso2/cont_vgas;
+
   if (readyToGetResetAndSendSensors)//si esta listo para reset y mandar datos
   {
     sensors.getAndResetAllSensors();//reseteamos los sensores y los mandamos llamar
-    char msg[256]; //cadena de 256 bytes
+    char msg[512]; //cadena de 256 bytes
     uint32_t UT=sensorReadings.unixTime;//lectura del unixtime
     float VV= sensorReadings.wind_metersph * 0.001;//lectura de la velocidad del viento
     float Precip = sensorReadings.rainmmx1000 / 1000.0; //lectura de precipitacion
@@ -420,22 +461,72 @@ void loop() {
     float Temp = (sensorReadings.airTempKx10 / 10.0)-273.15; //lectura de temperatura
     uint16_t mVB=sensorReadings.millivolts;//lectura de voltaje
     uint16_t Hum=sensorReadings.humid;//lectura de humedad
+    unsigned int PM1_0 = pm1();
+    unsigned int PM2_5 =pm2_5();
+    unsigned int PM10 = pm10();
     //uint16_t ozo=sensorReadings.ozone;
      
-  adc0 = ads.readADC_SingleEnded(0);
-  av0 = adc0 * multiplier;
+adc0 = ads.readADC_SingleEnded(0);
+  av0 = (adc0 * multiplier)/1000;
+  sumvgaso3+=av0;
+  promvgaso3 = sumvgaso3/cont_vgas;
   adc1 = ads.readADC_SingleEnded(1);
-  av1= adc1 * multiplier;
+  av1= (adc1 * multiplier)/1000;
+  sumvgasco+=av1;
+  promvgasco= sumvgasco/cont_vgas;
   adc2 = ads.readADC_SingleEnded(2);
-  av2= adc2 * multiplier;
+  av2= (adc2 * multiplier)/1000;
+  sumvgasno2+=av2;
+  promvgasno2= sumvgasno2/cont_vgas;
   adc3 = ads.readADC_SingleEnded(3);
-  av3= adc3 * multiplier;
+  av3= (adc3 * multiplier)/1000;
+  sumvgasso2+= av3;
+  promvgasso2= sumvgasso2/cont_vgas;
+double concentration_o3 =  -59.714 * (promvgaso3 - 	1.590161);
+cont++;
+sum_1 += concentration_o3;
+prom_conc_o3= sum_1/cont;
+if (prom_conc_o3 >= 0){
+prom_o3P = prom_conc_o3;
+prom_o3_past= prom_conc_o3;
+}else
+{
+  prom_o3P= prom_o3_past;
+}
+double concentration_co = 4149.377593 * (promvgasco - 1.631584333333333);
+sum_2 += concentration_co;
+prom_conc_co= sum_2/cont;
+if (prom_conc_co >= 0){
+prom_coP = prom_conc_co;
+prom_co_past= prom_conc_co;
+}else
+{
+  prom_coP= prom_co_past;
+}
+double concentration_no2 =  -95.474417152551887958861983137308 * (promvgasno2 - 1.624044);
+sum_3+= concentration_no2;
+prom_conc_no2= sum_3/cont;
+if (prom_conc_no2 >= 0){
+prom_no2P = prom_conc_no2;
+prom_no2_past= prom_conc_no2;
+}else
+{
+  prom_no2P= prom_no2_past;
+}
+double concentration_so2 =  346.26038781163434903047091412742 * (promvgasso2 - 1.6933555555555);
+sum_4+= concentration_so2;
+prom_conc_so2= sum_4/cont;
+if (prom_conc_so2 >= 0){
+prom_so2P = prom_conc_so2;
+prom_so2_past= prom_conc_so2;
+}else
+{
+  prom_so2P= prom_so2_past;
+}
     
-    //uint16_t promedio = spec_O3();
-   // float PB=sensorReadings.barometerhPa;
     
 snprintf(msg, sizeof(msg) , //imprimimos la cadena 
-"{\"UT\": %u, \"VV\": %.1f , \"Precip\": %.1f , \"DV\": %.1f , \"Temp\": %.1f ,\"Hum\": %u  ,\"mVB\": %u , \"O3\": %.5f ,\"CO\": %.5f ,\"NO2\": %.5f ,\"SO2\": %.5f ,}" , 
+"{\"UT\": %u, \"VV\": %.1f , \"Precip\": %.1f , \"DV\": %.1f , \"Temp\": %.1f ,\"Hum\": %u  ,\"mVB\": %u , \"O3\": %.6f ,\"CO\": %.6f ,\"NO2\": %.6f ,\"SO2\": %.6f ,\"VGASO3\": %.14f ,\"VGASCO\": %.14f ,\"VGASNO2\": %.14f ,\"VGASSO2\": %.14f ,\"PM1\": %u ,\"PM2.5\": %u ,\"PM10\": %u ,}" , 
 UT,
 VV, 
 Precip, 
@@ -443,11 +534,18 @@ DV ,
 Temp, 
 Hum,  
 mVB,
-av0,
-av1,
-av2,
-av3
-//ozo
+prom_o3P,
+prom_coP,
+prom_no2P,
+prom_so2P,
+promvgaso3,
+promvgasco,
+promvgasno2,
+promvgasso2,
+PM1_0,
+PM2_5,
+PM10
+
 );
 
  Particle.publish("sensors", msg, PRIVATE);//mandamos los datos a la nube de particle
@@ -623,3 +721,60 @@ void unplugged()
   
 //  // Serial.println(" ");
 // }
+unsigned int pm1(){
+  unsigned long now = millis();
+  if (pms7003.Read()) {
+    last_pm_reading = now;
+  }
+
+  if ((now - last) > 5000) {
+    // Let us be generous. Active state the device
+    // reports at least every 2.3 seconds.
+    if ((now - last_pm_reading) > 5000) {
+      //Serial.println("No reading for at least 10 seconds!");
+    } else {
+        unsigned int pm1 = pms7003.GetData(pms7003.pm1_0);
+        return pm1;		
+
+    }
+    last = now;
+  }
+}
+unsigned int pm2_5(){
+  unsigned long now_25 = millis();
+  if (pms7003.Read()) {
+    last_pm_reading_25 = now_25;
+  }
+
+  if ((now_25 - last_25) > 5000) {
+    // Let us be generous. Active state the device
+    // reports at least every 2.3 seconds.
+    if ((now_25 - last_pm_reading_25) > 5000) {
+      //Serial.println("No reading for at least 10 seconds!");
+    } else {
+        unsigned int pm2_5 = pms7003.GetData(pms7003.pm2_5);
+        return pm2_5;		
+
+    }
+    last = now_25;
+  }
+}
+unsigned int pm10(){
+  unsigned long now_10 = millis();
+  if (pms7003.Read()) {
+    last_pm_reading_10 = now_10;
+  }
+
+  if ((now_10 - last_10) > 5000) {
+    // Let us be generous. Active state the device
+    // reports at least every 2.3 seconds.
+    if ((now_10 - last_pm_reading_10) > 5000) {
+      //Serial.println("No reading for at least 10 seconds!");
+    } else {
+        unsigned int pm10 = pms7003.GetData(pms7003.pm10);
+        return pm10;		
+
+    }
+    last = now_10;
+  }
+}
